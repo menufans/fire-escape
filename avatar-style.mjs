@@ -1,0 +1,8 @@
+import * as T from './vendor/three.module.js';
+const ramp=new T.DataTexture(new Uint8Array([105,175,230,255]),4,1,T.RedFormat);ramp.minFilter=ramp.magFilter=T.NearestFilter;ramp.needsUpdate=true;
+export function stylizeCharacter(model,sex){
+ const palette={Skin:'#edc1a4',Eyes:'#365987',Eyebrows:'#675875',Hair:sex==='male'?'#8a95ad':'#c69bb7',HairBase:sex==='male'?'#8a95ad':'#b58aa7',Shirt:sex==='male'?'#b9cdd7':'#f1e8de',Pants:'#6c7d9b',Socks:'#efe6dc',Shoes:'#798195',Jacket:'#d89eaf',LightJacket:'#efb9c6'},materials=new Map();
+ model.updateMatrixWorld(true);model.traverse(o=>{if(!o.isMesh)return;const old=Array.isArray(o.material)?o.material:[o.material];o.material=old.map(m=>{if(!materials.has(m)){const t=new T.MeshToonMaterial({color:palette[m.name]||'#a8b7b4',gradientMap:ramp,emissive:palette[m.name]||'#a8b7b4',emissiveIntensity:.06});t.name=m.name;materials.set(m,t)}return materials.get(m)});if(o.material.length===1)o.material=o.material[0];o.castShadow=false;o.receiveShadow=false;
+  if(!old.some(m=>m.name==='Eyes')||!o.geometry.index?.count)return;const pos=o.geometry.attributes.position,ids=[...new Set(o.geometry.index.array)],groups=[[],[]],v=new T.Vector3(),inv=o.matrixWorld.clone().invert();for(const i of ids){v.fromBufferAttribute(pos,i).applyMatrix4(o.matrixWorld);groups[v.x<0?0:1].push({i,p:v.clone()})}for(const group of groups){if(!group.length)continue;const center=group.reduce((s,a)=>s.add(a.p),new T.Vector3()).multiplyScalar(1/group.length);for(const {i,p}of group){p.x=center.x+(p.x-center.x)*1.3;p.y=center.y+(p.y-center.y)*1.55;p.applyMatrix4(inv);pos.setXYZ(i,p.x,p.y,p.z)}}pos.needsUpdate=true;o.geometry.computeVertexNormals();
+ });const head=model.getObjectByName('Head');return{head,scale:head?.scale.clone()};
+}

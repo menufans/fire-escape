@@ -1,0 +1,10 @@
+import * as T from './vendor/three.module.js';
+// Share the full skeleton. Hide the head AND near-camera collar/chest only in first person.
+// Hands in the rest T-pose must not be mistaken for head triangles by height alone.
+export function splitFirstPersonHead(model,bounds){
+ const height=bounds.max.y-bounds.min.y,center=bounds.getCenter(new T.Vector3()),meshes=[];model.traverse(o=>{if(o.isSkinnedMesh)meshes.push(o)});let headTriangles=0,bodyTriangles=0;
+ for(const mesh of meshes){const geo=mesh.geometry,pos=geo.attributes.position,source=geo.index?.array||Array.from({length:pos.count},(_,i)=>i),head=[],body=[],hg=geo.clone(),bg=geo.clone(),v=new T.Vector3(),materials=Array.isArray(mesh.material)?mesh.material:[mesh.material];hg.clearGroups();bg.clearGroups();
+  for(const group of geo.groups.length?geo.groups:[{start:0,count:source.length,materialIndex:0}]){const hs=head.length,bs=body.length,cloth=/Tops/.test(materials[group.materialIndex]?.name||'');for(let i=group.start;i<group.start+group.count;i+=3){let x=0,y=0;for(let j=0;j<3;j++){v.fromBufferAttribute(pos,source[i+j]).applyMatrix4(mesh.matrixWorld);x+=v.x;y+=v.y}x/=3;y/=3;const central=cloth||Math.abs(x-center.x)<height*.16,cutoff=bounds.min.y+height*(central?.68:.83),out=y>cutoff?head:body;out.push(source[i],source[i+1],source[i+2])}if(head.length>hs)hg.addGroup(hs,head.length-hs,group.materialIndex);if(body.length>bs)bg.addGroup(bs,body.length-bs,group.materialIndex)}
+  if(!head.length){hg.dispose();bg.dispose();continue}hg.setIndex(head);bg.setIndex(body);mesh.geometry=bg;const h=new T.SkinnedMesh(hg,mesh.material);h.name=mesh.name+'_MirrorHead';h.position.copy(mesh.position);h.quaternion.copy(mesh.quaternion);h.scale.copy(mesh.scale);h.skeleton=mesh.skeleton;h.bindMode=mesh.bindMode;h.bindMatrix.copy(mesh.bindMatrix);h.bindMatrixInverse.copy(mesh.bindMatrixInverse);h.layers.set(1);h.frustumCulled=false;mesh.parent.add(h);headTriangles+=head.length/3;bodyTriangles+=body.length/3;geo.dispose()
+ }return{headTriangles,bodyTriangles}
+}
